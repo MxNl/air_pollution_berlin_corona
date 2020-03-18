@@ -4,27 +4,88 @@ author: "Maximilian Nölscher"
 date: "`r format(Sys.Date())`"
 output: github_document
 ---
+```{r, include=FALSE}
+purrr::map(
+  list.files(
+    path = './functions',
+    pattern = "\\.R$",
+    full.names = TRUE,
+    recursive = TRUE
+  ),
+  source
+)
+```
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(fig.align = "center")
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(sf)
+library(tidyverse)
+library(lubridate)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Data Import
+```{r}
+data_background <- read_csv2('raw_data/ber_mc010_20190401-20200331.csv', skip = 3)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Column names
+```{r}
+col_names <- read_csv2('raw_data/ber_mc010_20190401-20200331.csv') %>% 
+  slice(1) %>% 
+  pivot_longer(cols = everything()) %>% 
+  pull(value)
+```
+
+Rename columns of `data_background`
+```{r}
+data_background <- data_background %>% 
+  set_names(col_names) %>% 
+  janitor::clean_names() %>% 
+  rename(date = messkomponente)
+```
+
+Fix date column
+```{r}
+data_background <- data_background %>% 
+  mutate(date = dmy_hm(date))
+```
+
+Add columns for year, month, ...
+```{r}
+data_background <- data_background %>% 
+  mutate(year = year(date)) %>% 
+  mutate(month = month(date)) %>% 
+  mutate(week = week(date)) %>% 
+  mutate(day = day(date)) %>% 
+  select(date, year, month, week, day, everything())
+```
+
+Show the dataframe
+```{r}
+data_background
+```
+
+# First visualizations
+```{r}
+variables <- c("feinstaub_pm10", "stickstoffmonoxid", "stickstoffdioxid", "stickoxide", "ozon")
+```
+
+
+```{r}
+data_background %>% 
+  pivot_longer(cols = one_of(variables)) %>% 
+  ggplot(aes(date, value, group = name)) +
+  geom_line(colour = 'red',
+            alpha = .6) +
+  scale_x_datetime(date_breaks = "month") +
+  facet_wrap(~name, ncol = 1)
+```
+
+
