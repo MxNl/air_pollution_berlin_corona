@@ -293,7 +293,8 @@ data_background %>%
   # scale_x_datetime(date_breaks = "month") +
   # scale_fill_gradient(low = 'darkgreen', high = 'red') +
   scale_fill_viridis_c() +
-  scale_x_continuous(breaks = seq(0, 365, 10)) +
+  scale_x_continuous(breaks = seq(0, 365, 10), 
+                     guide = guide_axis(n.dodge = 2)) +
   scale_y_reverse(breaks = unique(pull(data_background, year))) +
   labs(fill = "mean") +
   facet_wrap(~name, ncol = 1, scales = "free_y")
