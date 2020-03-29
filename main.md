@@ -99,7 +99,7 @@ Show the dataframe
 data_background
 ```
 
-    ## # A tibble: 87,731 x 11
+    ## # A tibble: 87,755 x 11
     ##    date                 year month  week   day weekday daytime yearday
     ##    <dttm>              <dbl> <dbl> <dbl> <int> <chr>     <int>   <dbl>
     ##  1 2010-03-23 00:00:00  2010     3    12    23 Tuesday       0      82
@@ -112,7 +112,7 @@ data_background
     ##  8 2010-03-23 07:00:00  2010     3    12    23 Tuesday       7      82
     ##  9 2010-03-23 08:00:00  2010     3    12    23 Tuesday       8      82
     ## 10 2010-03-23 09:00:00  2010     3    12    23 Tuesday       9      82
-    ## # … with 87,721 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
+    ## # … with 87,745 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
     ## #   stickstoffdioxid <dbl>, stickoxide <dbl>
 
 # First visualizations
@@ -337,8 +337,7 @@ data_background %>%
   # scale_fill_gradient(low = 'darkgreen', high = 'red') +
   scale_fill_viridis_c() +
   scale_x_continuous(breaks = seq(0, 52, 5)) +
-  scale_y_reverse(breaks = unique(pull(data_background, year))) +
-  facet_wrap(~name, ncol = 1, scales = "free_y")
+  scale_y_reverse(breaks = unique(pull(data_background, year)))
 ```
 
 <img src="main_files/figure-gfm/unnamed-chunk-24-1.png" style="display: block; margin: auto;" />
@@ -359,8 +358,25 @@ data_background %>%
     guide = guide_axis(n.dodge = 2)
   ) +
   scale_y_reverse(breaks = unique(pull(data_background, year))) +
-  labs(fill = "mean") +
-  facet_wrap(~name, ncol = 1, scales = "free_y")
+  labs(fill = "mean")
 ```
 
 <img src="main_files/figure-gfm/unnamed-chunk-25-1.png" style="display: block; margin: auto;" />
+
+Compare this years week 12 and 13 to those from the past
+
+``` r
+data_background %>% 
+  select(-stickoxide) %>% 
+  filter(week %in% c(12, 13)) %>% 
+  pivot_longer(cols = one_of(variables)) %>%
+  group_by(name, year) %>%
+  summarise(mean_year_kw1213 = mean(value, na.rm = TRUE)) %>% 
+  ggplot(aes(year, mean_year_kw1213)) +
+  geom_col(aes(fill = mean_year_kw1213)) +
+  scale_x_continuous(labels = as.integer) +
+  scale_fill_gradient(low = "darkgreen", high = "red") +
+  facet_wrap(~name, ncol = 1)
+```
+
+<img src="main_files/figure-gfm/unnamed-chunk-26-1.png" style="display: block; margin: auto;" />
