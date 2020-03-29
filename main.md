@@ -1,7 +1,7 @@
 Air Pollution in Berlin during Corona
 ================
 Maximilian Nölscher
-2020-03-22
+2020-03-29
 
 ``` r
 library(sf)
@@ -99,7 +99,7 @@ Show the dataframe
 data_background
 ```
 
-    ## # A tibble: 87,563 x 11
+    ## # A tibble: 87,731 x 11
     ##    date                 year month  week   day weekday daytime yearday
     ##    <dttm>              <dbl> <dbl> <dbl> <int> <chr>     <int>   <dbl>
     ##  1 2010-03-23 00:00:00  2010     3    12    23 Tuesday       0      82
@@ -112,7 +112,7 @@ data_background
     ##  8 2010-03-23 07:00:00  2010     3    12    23 Tuesday       7      82
     ##  9 2010-03-23 08:00:00  2010     3    12    23 Tuesday       8      82
     ## 10 2010-03-23 09:00:00  2010     3    12    23 Tuesday       9      82
-    ## # … with 87,553 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
+    ## # … with 87,721 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
     ## #   stickstoffdioxid <dbl>, stickoxide <dbl>
 
 # First visualizations
