@@ -4,6 +4,7 @@ author: "Maximilian Nölscher"
 date: "`r format(Sys.Date())`"
 output: github_document
 ---
+
 ```{r, include=FALSE}
 purrr::map(
   list.files(
