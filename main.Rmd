@@ -26,79 +26,162 @@ knitr::opts_chunk$set(fig.width = 10)
 
 ```{r}
 library(sf)
-library(tidyverse)
 library(lubridate)
+library(rvest)
+library(tidyverse)
 ```
 
 
-# Data Import
+# Data Import through Web Scraping
 
-Path to file
+Read website
 ```{r}
-path_to_file <- "raw_data/verkehr/"
+airquality_website <- read_html("https://luftdaten.berlin.de/lqi")
 ```
 
-List all files in path
+Get station information
 ```{r}
-files <- path_to_file %>%
-  list.files() %>%
-  paste0(path_to_file, .)
+stations <- airquality_website %>%
+  html_nodes(".lmn-table__cell--contentAsResponsiveHeadline") %>%
+  html_text() %>%
+  # tibble(text = .) %>%
+  str_remove_all(" ") %>%
+  # str_squish() %>%
+  str_replace_all("\\n+", "_") %>%
+  str_sub(2) %>%
+  str_sub(end = -2) %>%
+  tibble(station = .) %>%
+  separate(col = "station", into = c("station", "type", "description"), sep = "_") %>%
+  mutate(station_id = str_sub(station, 1, 3)) %>%
+  mutate(station = str_sub(station, 4)) %>%
+  select(station_id, everything())
 ```
 
+Create template url for csv download
 ```{r}
-if (str_detect(path_to_file, "verkehr")) {
-  data_background <- files %>%
-    map_dfr(~ read_csv2(., skip = 3))
-} else if (str_detect(path_to_file, "hintergrund")) {
-  data_background <- files %>%
-    map(~ read_csv2(., skip = 3)) %>%
-    map(~ select(., 1:5)) %>%
-    bind_rows()
-}
+url_template <- "https://luftdaten.berlin.de/station/mc+++.csv?group=pollution&period=1h&timespan=custom&start%5Bdate%5D=__________&start%5Bhour%5D=00&end%5Bdate%5D=----------&end%5Bhour%5D=00"
+```
+Replace 
+
+- `+++` by the station id
+- `__________` by the start date
+- `----------` by the end date
+
+Create station urls
+```{r}
+download_urls <- stations %>%
+  select(station_id) %>%
+  mutate(url = url_template) %>%
+  mutate(url = str_replace(url, "\\+++", station_id))
 ```
 
-Column names
+Define starting dates
 ```{r}
-if (str_detect(path_to_file, "verkehr")) {
-  col_names <- files[1] %>%
-    read_csv2() %>%
-    slice(1) %>%
-    pivot_longer(cols = everything()) %>%
-    pull(value)
-} else if (str_detect(path_to_file, "hintergrund")) {
-  col_names <- files[1] %>%
-    read_csv2() %>%
-    slice(1) %>%
-    pivot_longer(cols = everything()) %>%
-    slice(1:5) %>%
-    pull(value)
-}
+start_year <- 2004
+
+first_dates <- c(paste0(start_year, "-01-01"), paste0(start_year, "-12-31"))
 ```
 
-Rename columns of `data_background`
+Define a number of years to scrape data for
 ```{r}
-data_background <- data_background %>%
-  set_names(col_names) %>%
-  janitor::clean_names() %>%
-  rename(date = messkomponente)
+number_of_years <- Sys.Date() %>% year() - start_year + 1
+```
+
+Create tables with starting and ending dates, as it is only possible to download data for 1 yeat per request
+```{r}
+period_starting_dates <- tibble(
+  from = seq.Date(as.Date(first_dates[1]),
+    by = "year",
+    length.out = number_of_years
+  )
+) %>%
+  mutate_all(cus_fun_date_format_to_german)
+
+
+
+period_ending_dates <- tibble(
+  to = seq.Date(as.Date(first_dates[2]),
+    by = "year",
+    length.out = number_of_years
+  )
+) %>%
+  mutate_all(cus_fun_date_format_to_german)
+```
+
+Make dataframe of urls to fetch
+```{r}
+urls_to_fetch <- map2_dfr(period_starting_dates,
+                          period_ending_dates,
+                          .f = ~ cus_fun_fill_dates_in_url(pull(filter(download_urls, station_id == 115), url), 
+                                                           .x, 
+                                                           .y)
+)
+```
+
+
+
+Download the data for all the defined years at one station
+```{r}
+download <- urls_to_fetch %>% 
+  pull(from) %>% 
+  map(cus_fun_read_csv_from_url)
+```
+
+Remove header rows
+```{r}
+station_data <- download %>% 
+  map(~slice(., -c(2:3))) %>% 
+  map(~set_names(., as_vector(slice(., 1)))) %>% 
+  map(~slice(., -1))
+```
+
+Determine all columns that are common to all years
+```{r}
+columns_to_keep <- station_data %>% 
+  map(~names(.)) %>% 
+  Reduce(intersect, .)
+```
+
+Fix column names
+```{r}
+station_data <- station_data %>% 
+  map_dfr(~select(., one_of(columns_to_keep))) %>% 
+  rename("date" = 1) %>% 
+  janitor::clean_names()
 ```
 
 Fix date column
 ```{r}
-data_background <- data_background %>%
+station_data <- station_data %>% 
   mutate(date = dmy_hm(date))
 ```
 
-Remove duplicate observations
+Remove possible duplicates
 ```{r}
-data_background <- data_background %>%
+station_data <- station_data %>%
   distinct(date, .keep_all = TRUE)
 ```
 
+Fix column data types
+```{r}
+station_data <- station_data %>% 
+  mutate_if(is.character, as.numeric)
+```
+
+Define parameters
+```{r}
+variables <- c("stickstoffmonoxid", "stickstoffdioxid", "stickoxide")
+```
+
+Select those parameters
+```{r}
+station_data <- station_data %>% 
+  select(date, one_of(variables))
+```
 
 Add columns for year, month, ...
 ```{r}
-data_background <- data_background %>%
+station_data <- station_data %>%
   mutate(year = year(date)) %>%
   mutate(month = month(date)) %>%
   mutate(week = week(date)) %>%
@@ -111,27 +194,30 @@ data_background <- data_background %>%
 
 Show the dataframe
 ```{r}
-data_background
+station_data
 ```
 
-# First visualizations
 ```{r}
-variables <- c("stickstoffmonoxid", "stickstoffdioxid", "stickoxide")
+station_data <- station_data %>% 
+  janitor::remove_empty(c("cols", "rows"))
 ```
+
+
+# First visualizations
 
 Clean outliers
 ```{r}
-data_background <- data_background %>%
+station_data <- station_data %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name) %>%
   mutate(value = ifelse(value >= 1e4, NA, value)) %>%
-  mutate(value = zoo::na.approx(value)) %>%
+  mutate(value = zoo::na.approx(value, na.rm = FALSE)) %>%
   pivot_wider()
 ```
 
 
 ```{r}
-data_background %>%
+station_data %>%
   pivot_longer(cols = one_of(variables)) %>%
   ggplot(aes(date, value, group = name)) +
   geom_line(
@@ -139,16 +225,23 @@ data_background %>%
     alpha = .6
   ) +
   scale_x_datetime(
-    date_breaks = "3 months",
+    date_breaks = "1 year",
     # date_minor_breaks = "1 month",
     date_labels = "%b\n'%y"
   ) +
   facet_wrap(~name, ncol = 1, scales = "free_y")
 ```
 
+Filter out years before the data gab
+```{r}
+station_data <- station_data %>% 
+  filter(year >= 2002)
+```
+
+
 Weekly mean concentration
 ```{r}
-data_background %>%
+station_data %>%
   select(-stickoxide) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, week) %>%
@@ -164,7 +257,7 @@ data_background %>%
 
 Daily values compared to period mean
 ```{r}
-data_background %>%
+station_data %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name) %>%
   mutate(mean = mean(value, na.rm = TRUE)) %>%
@@ -185,7 +278,7 @@ data_background %>%
   # scale_fill_manual() +
   scale_fill_gradient2(low = "darkgreen", mid = "snow3", high = "red") +
   scale_x_date(
-    date_breaks = "3 month",
+    date_breaks = "1 year",
     date_minor_breaks = "1 month",
     date_labels = "%b\n'%y"
   ) +
@@ -195,7 +288,7 @@ data_background %>%
 
 Mean daily values compared to period mean
 ```{r}
-data_background %>%
+station_data %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name) %>%
   mutate(mean = mean(value, na.rm = TRUE)) %>%
@@ -247,7 +340,7 @@ names(days_in_week_vec) <- days_in_week %>% pull(weekday)
 
 Mean concentrations per weekday
 ```{r}
-data_background %>%
+station_data %>%
   select(-stickoxide) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, weekday) %>%
@@ -268,7 +361,7 @@ data_background %>%
 
 Mean concentrations per per hour per weekday
 ```{r}
-data_background %>%
+station_data %>%
   select(-stickoxide) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, weekday, daytime) %>%
@@ -285,7 +378,7 @@ data_background %>%
 
 Mean concentrations per per hour per weekday
 ```{r}
-data_background %>%
+station_data %>%
   select(-stickoxide) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, weekday, daytime) %>%
@@ -306,7 +399,7 @@ data_background %>%
 
 
 ```{r}
-data_background %>%
+station_data %>%
   select(-stickstoffdioxid, -stickstoffmonoxid) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, year, week) %>%
@@ -317,12 +410,12 @@ data_background %>%
   # scale_fill_gradient(low = 'darkgreen', high = 'red') +
   scale_fill_viridis_c() +
   scale_x_continuous(breaks = seq(0, 52, 5)) +
-  scale_y_reverse(breaks = unique(pull(data_background, year)))
+  scale_y_reverse(breaks = unique(pull(station_data, year)))
 ```
 
 
 ```{r}
-data_background %>%
+station_data %>%
   select(-stickstoffdioxid, -stickstoffmonoxid) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, year, yearday) %>%
@@ -336,18 +429,18 @@ data_background %>%
     breaks = seq(0, 365, 10),
     guide = guide_axis(n.dodge = 2)
   ) +
-  scale_y_reverse(breaks = unique(pull(data_background, year))) +
+  scale_y_reverse(breaks = unique(pull(station_data, year))) +
   labs(fill = "mean")
 ```
 
 Compare this years week 12 and 13 to those from the past
 ```{r}
-data_background %>% 
-  select(-stickoxide) %>% 
-  filter(week %in% c(12, 13)) %>% 
+station_data %>%
+  select(-stickoxide) %>%
+  filter(week %in% c(12, 13)) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, year) %>%
-  summarise(mean_year_kw1213 = mean(value, na.rm = TRUE)) %>% 
+  summarise(mean_year_kw1213 = mean(value, na.rm = TRUE)) %>%
   ggplot(aes(year, mean_year_kw1213)) +
   geom_col(aes(fill = mean_year_kw1213)) +
   scale_x_continuous(labels = as.integer) +
