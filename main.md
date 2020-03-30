@@ -1,7 +1,7 @@
 Air Pollution in Berlin during Corona
 ================
 Maximilian Nölscher
-2020-03-30
+2020-03-31
 
 ``` r
 library(sf)
@@ -195,7 +195,7 @@ Show the dataframe
 station_data
 ```
 
-    ## # A tibble: 141,955 x 11
+    ## # A tibble: 141,957 x 11
     ##    date                 year month  week   day weekday daytime yearday
     ##    <dttm>              <dbl> <dbl> <dbl> <int> <chr>     <int>   <dbl>
     ##  1 2004-01-01 01:00:00  2004     1     1     1 Thursd…       1       1
@@ -208,7 +208,7 @@ station_data
     ##  8 2004-01-01 08:00:00  2004     1     1     1 Thursd…       8       1
     ##  9 2004-01-01 09:00:00  2004     1     1     1 Thursd…       9       1
     ## 10 2004-01-01 10:00:00  2004     1     1     1 Thursd…      10       1
-    ## # … with 141,945 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
+    ## # … with 141,947 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
     ## #   stickstoffdioxid <dbl>, stickoxide <dbl>
 
 ``` r
@@ -405,6 +405,54 @@ station_data %>%
 
 <img src="main_files/figure-gfm/unnamed-chunk-33-1.png" style="display: block; margin: auto;" />
 
+Concentrations over the day on weekdays over time
+
+``` r
+station_data %>%
+  select(-stickoxide) %>%
+  pivot_longer(cols = one_of(variables)) %>%
+  left_join(days_in_week, by = "weekday") %>% 
+  filter(weekday_id <= 5) %>% 
+  group_by(name, year, daytime) %>% 
+  summarise(mean_year_weekday_daytime = mean(value, na.rm = TRUE)) %>%
+  # left_join(days_in_week, by = "weekday") %>%
+  # arrange(weekday_id, daytime) %>%
+  # group_by(name) %>%
+  # arrange(weekday_id, daytime) %>%
+  ggplot(aes(daytime, year, fill = mean_year_weekday_daytime, group = name)) +
+  geom_tile() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_c() +
+  scale_y_reverse() +
+  facet_wrap(~ name)
+```
+
+<img src="main_files/figure-gfm/unnamed-chunk-34-1.png" style="display: block; margin: auto;" />
+
+Concentrations over the day on weekends over time
+
+``` r
+station_data %>%
+  select(-stickoxide) %>%
+  pivot_longer(cols = one_of(variables)) %>%
+  left_join(days_in_week, by = "weekday") %>% 
+  filter(weekday_id > 5) %>% 
+  group_by(name, year, daytime) %>% 
+  summarise(mean_year_weekday_daytime = mean(value, na.rm = TRUE)) %>%
+  # left_join(days_in_week, by = "weekday") %>%
+  # arrange(weekday_id, daytime) %>%
+  # group_by(name) %>%
+  # arrange(weekday_id, daytime) %>%
+  ggplot(aes(daytime, year, fill = mean_year_weekday_daytime, group = name)) +
+  geom_tile() +
+  theme(legend.position = "none") +
+  scale_fill_viridis_c() +
+  scale_y_reverse() +
+  facet_wrap(~ name)
+```
+
+<img src="main_files/figure-gfm/unnamed-chunk-35-1.png" style="display: block; margin: auto;" />
+
 Mean concentrations per per hour per weekday
 
 ``` r
@@ -427,7 +475,7 @@ station_data %>%
   facet_wrap(~name, ncol = 3, scales = "free_y")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-34-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-36-1.png" style="display: block; margin: auto;" />
 
 ``` r
 station_data %>%
@@ -436,7 +484,7 @@ station_data %>%
   group_by(name, year, week) %>%
   summarise(mean_year_day = mean(value, na.rm = TRUE)) %>%
   ggplot(aes(week, year, group = name, fill = mean_year_day)) +
-  geom_tile(alpha = .7) +
+  geom_tile() +
   # scale_x_datetime(date_breaks = "month") +
   # scale_fill_gradient(low = 'darkgreen', high = 'red') +
   scale_fill_viridis_c() +
@@ -444,7 +492,7 @@ station_data %>%
   scale_y_reverse(breaks = unique(pull(station_data, year)))
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-35-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-37-1.png" style="display: block; margin: auto;" />
 
 ``` r
 station_data %>%
@@ -453,7 +501,7 @@ station_data %>%
   group_by(name, year, yearday) %>%
   summarise(mean_year_yearday = mean(value, na.rm = TRUE)) %>%
   ggplot(aes(yearday, year, group = name, fill = mean_year_yearday)) +
-  geom_tile(alpha = .7) +
+  geom_tile() +
   # scale_x_datetime(date_breaks = "month") +
   # scale_fill_gradient(low = 'darkgreen', high = 'red') +
   scale_fill_viridis_c() +
@@ -465,7 +513,7 @@ station_data %>%
   labs(fill = "mean")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-36-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-38-1.png" style="display: block; margin: auto;" />
 
 Compare this years week 12 and 13 to those from the past
 
@@ -483,4 +531,4 @@ station_data %>%
   facet_wrap(~name, ncol = 1)
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-37-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-39-1.png" style="display: block; margin: auto;" />
