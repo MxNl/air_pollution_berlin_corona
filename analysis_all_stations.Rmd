@@ -1,10 +1,10 @@
 ---
-title: "Air Pollution in Berlin during Corona"
+title: "Air Pollution in Berlin, all period, all stations"
 author: "Maximilian Nölscher"
 date: "`r format(Sys.Date())`"
 output: github_document
 ---
-
+  
 ```{r, include=FALSE}
 purrr::map(
   list.files(
@@ -40,7 +40,7 @@ Read website
 airquality_website <- read_html("https://luftdaten.berlin.de/lqi")
 ```
 
-Get station information
+Get station overview
 ```{r}
 stations <- airquality_website %>%
   html_nodes(".lmn-table__cell--contentAsResponsiveHeadline") %>%
@@ -57,6 +57,64 @@ stations <- airquality_website %>%
   mutate(station = str_sub(station, 4)) %>%
   select(station_id, everything())
 ```
+
+Add measurement periods for each station
+```{r}
+template_url_detailed_information <- "https://luftdaten.berlin.de/station/mc<stationid>#station-info"
+```
+
+```{r}
+urls_detailed_information <- stations %>%
+  select(station_id) %>%
+  mutate(url = template_url_detailed_information) %>%
+  mutate(url = str_replace(url, "<stationid>", station_id))
+```
+
+```{r}
+period_start <- urls_detailed_information %>%
+  pull(url) %>%
+  map(possibly(cus_fun_scrape_measurement_begin, NA))
+
+stations <- stations %>%
+  mutate(period_start = unlist(period_start)) %>%
+  mutate(period_start = dmy(period_start)) %>%
+  select(-description)
+```
+
+Remove stations without a value for period_start
+```{r}
+stations <- stations %>%
+  drop_na(period_start)
+```
+
+Drop stations at "Stadtrand"
+```{r}
+stations <- stations %>%
+  filter(type != "Stadtrand")
+```
+
+```{r}
+n_colours <- stations %>% nrow()
+
+stations %>% 
+  mutate(period_end = Sys.Date()) %>% 
+  pivot_longer(cols = contains("period")) %>% 
+  # mutate(test = as.POSIXct())
+  ggplot(aes(value, station)) +
+  geom_line(size = 5,
+            colour = "red",
+            alpha = .6) +
+  scale_color_manual(values = hues::iwanthue(n_colours))
+```
+
+
+```{r}
+min_date <- ymd("2000-01-01")
+
+stations <- stations %>% 
+  filter(period_start <= min_date)
+```
+
 
 Create template url for csv download
 ```{r}
@@ -78,7 +136,7 @@ download_urls <- stations %>%
 
 Define starting dates
 ```{r}
-start_year <- 2004
+start_year <- min_date
 
 first_dates <- c(paste0(start_year, "-01-01"), paste0(start_year, "-12-31"))
 ```
@@ -112,10 +170,12 @@ period_ending_dates <- tibble(
 Make dataframe of urls to fetch
 ```{r}
 urls_to_fetch <- map2_dfr(period_starting_dates,
-                          period_ending_dates,
-                          .f = ~ cus_fun_fill_dates_in_url(pull(filter(download_urls, station_id == 115), url), 
-                                                           .x, 
-                                                           .y)
+  period_ending_dates,
+  .f = ~ cus_fun_fill_dates_in_url(
+    pull(filter(download_urls, station_id == 115), url),
+    .x,
+    .y
+  )
 )
 ```
 
@@ -123,37 +183,37 @@ urls_to_fetch <- map2_dfr(period_starting_dates,
 
 Download the data for all the defined years at one station
 ```{r}
-download <- urls_to_fetch %>% 
-  pull(from) %>% 
+download <- urls_to_fetch %>%
+  pull(from) %>%
   map(cus_fun_read_csv_from_url)
 ```
 
 Remove header rows
 ```{r}
-station_data <- download %>% 
-  map(~slice(., -c(2:3))) %>% 
-  map(~set_names(., as_vector(slice(., 1)))) %>% 
-  map(~slice(., -1))
+station_data <- download %>%
+  map(~ slice(., -c(2:3))) %>%
+  map(~ set_names(., as_vector(slice(., 1)))) %>%
+  map(~ slice(., -1))
 ```
 
 Determine all columns that are common to all years
 ```{r}
-columns_to_keep <- station_data %>% 
-  map(~names(.)) %>% 
+columns_to_keep <- station_data %>%
+  map(~ names(.)) %>%
   Reduce(intersect, .)
 ```
 
 Fix column names
 ```{r}
-station_data <- station_data %>% 
-  map_dfr(~select(., one_of(columns_to_keep))) %>% 
-  rename("date" = 1) %>% 
+station_data <- station_data %>%
+  map_dfr(~ select(., one_of(columns_to_keep))) %>%
+  rename("date" = 1) %>%
   janitor::clean_names()
 ```
 
 Fix date column
 ```{r}
-station_data <- station_data %>% 
+station_data <- station_data %>%
   mutate(date = dmy_hm(date))
 ```
 
@@ -165,7 +225,7 @@ station_data <- station_data %>%
 
 Fix column data types
 ```{r}
-station_data <- station_data %>% 
+station_data <- station_data %>%
   mutate_if(is.character, as.numeric)
 ```
 
@@ -176,7 +236,7 @@ variables <- c("stickstoffmonoxid", "stickstoffdioxid", "stickoxide")
 
 Select those parameters
 ```{r}
-station_data <- station_data %>% 
+station_data <- station_data %>%
   select(date, one_of(variables))
 ```
 
@@ -199,7 +259,7 @@ station_data
 ```
 
 ```{r}
-station_data <- station_data %>% 
+station_data <- station_data %>%
   janitor::remove_empty(c("cols", "rows"))
 ```
 
@@ -235,7 +295,7 @@ station_data %>%
 
 Filter out years before the data gab
 ```{r}
-station_data <- station_data %>% 
+station_data <- station_data %>%
   filter(year >= 2002)
 ```
 
@@ -382,9 +442,9 @@ Concentrations over the day on weekdays over time
 station_data %>%
   select(-stickoxide) %>%
   pivot_longer(cols = one_of(variables)) %>%
-  left_join(days_in_week, by = "weekday") %>% 
-  filter(weekday_id <= 5) %>% 
-  group_by(name, year, daytime) %>% 
+  left_join(days_in_week, by = "weekday") %>%
+  filter(weekday_id <= 5) %>%
+  group_by(name, year, daytime) %>%
   summarise(mean_year_weekday_daytime = mean(value, na.rm = TRUE)) %>%
   # left_join(days_in_week, by = "weekday") %>%
   # arrange(weekday_id, daytime) %>%
@@ -395,7 +455,7 @@ station_data %>%
   theme(legend.position = "none") +
   scale_fill_viridis_c() +
   scale_y_reverse() +
-  facet_wrap(~ name)
+  facet_wrap(~name)
 ```
 
 Concentrations over the day on weekends over time
@@ -403,9 +463,9 @@ Concentrations over the day on weekends over time
 station_data %>%
   select(-stickoxide) %>%
   pivot_longer(cols = one_of(variables)) %>%
-  left_join(days_in_week, by = "weekday") %>% 
-  filter(weekday_id > 5) %>% 
-  group_by(name, year, daytime) %>% 
+  left_join(days_in_week, by = "weekday") %>%
+  filter(weekday_id > 5) %>%
+  group_by(name, year, daytime) %>%
   summarise(mean_year_weekday_daytime = mean(value, na.rm = TRUE)) %>%
   # left_join(days_in_week, by = "weekday") %>%
   # arrange(weekday_id, daytime) %>%
@@ -416,7 +476,7 @@ station_data %>%
   theme(legend.position = "none") +
   scale_fill_viridis_c() +
   scale_y_reverse() +
-  facet_wrap(~ name)
+  facet_wrap(~name)
 ```
 
 Mean concentrations per per hour per weekday
@@ -475,87 +535,6 @@ station_data %>%
   scale_y_reverse(breaks = unique(pull(station_data, year))) +
   labs(fill = "mean")
 ```
-
-## Before After Comparison
-
-```{r}
-date_corona_restrictions <- ymd_hms("2020-03-21 00:00:00")
-```
-
-
-```{r}
-station_data <- station_data %>% 
-  mutate(corona = if_else(date >= date_corona_restrictions, "after", "before"))
-```
-
-```{r}
-calender_weeks_since_corona <- station_data %>% 
-  filter(corona == "after") %>% 
-  distinct(week) %>% 
-  pull(week)
-```
-
-
-```{r}
-station_data %>% 
-  filter(week %in% calender_weeks_since_corona) %>%
-  select(-stickoxide) %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(corona, name, weekday) %>%
-  summarise(mean_weekday = mean(value, na.rm = TRUE)) %>%
-  group_by(name) %>%
-  left_join(days_in_week) %>%
-  arrange(weekday_id) %>%
-  ggplot(aes(weekday_id, mean_weekday, group = name)) +
-  geom_col(alpha = .5,
-           fill = "red",
-           alpha = 0.6) +
-  theme(legend.position = "none") +
-  scale_x_continuous(
-    breaks = 1:7,
-    labels = pull(days_in_week, weekday)
-  ) +
-  # scale_fill_gradient(low = "darkgreen", high = "red") +
-  facet_grid(corona ~ name)
-```
-
-
-```{r}
-station_data %>%
-  filter(week %in% calender_weeks_since_corona) %>%
-  select(-stickstoffdioxid, -stickstoffmonoxid) %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(corona, name, weekday, daytime) %>%
-  summarise(mean_weekday_daytime = mean(value, na.rm = TRUE)) %>%
-  group_by(name) %>%
-  left_join(days_in_week, by = "weekday") %>%
-  arrange(weekday_id, daytime) %>%
-  ggplot(aes(daytime, mean_weekday_daytime, colour = corona, group = corona)) +
-  geom_line(alpha = .5,
-            size = 1) +
-  # theme(legend.position = "none") +
-  # scale_fill_gradient(low = "darkgreen", high = "red") +
-  facet_grid(weekday_id ~ name)
-```
-
-
-```{r}
-station_data %>%
-  filter(week %in% calender_weeks_since_corona) %>%
-  select(-stickoxide, -stickstoffmonoxid) %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(corona, name, weekday, daytime) %>%
-  summarise(mean_weekday_daytime = mean(value, na.rm = TRUE)) %>%
-  group_by(name) %>%
-  left_join(days_in_week, by = "weekday") %>%
-  arrange(weekday_id, daytime) %>%
-  ggplot(aes(daytime, mean_weekday_daytime, fill = mean_weekday_daytime, group = name)) +
-  geom_col(alpha = .5) +
-  theme(legend.position = "none") +
-  scale_fill_gradient(low = "darkgreen", high = "red") +
-  facet_grid(corona ~ weekday_id)
-```
-
 
 Compare this years week 12 and 13 to those from the past
 ```{r}
