@@ -17,12 +17,12 @@ purrr::map(
 )
 ```
 
-```{r, include=FALSE}
+```{r, echo=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(warning = FALSE)
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(fig.align = "center")
-knitr::opts_chunk$set(fig.width = 10)
+knitr::opts_chunk$set(out.width = "100%")
 ```
 
 ```{r}
@@ -287,45 +287,6 @@ station_data %>%
   facet_wrap(~name, ncol = 1, scales = "free_y")
 ```
 
-Mean daily values compared to period mean
-```{r}
-station_data %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(name) %>%
-  mutate(mean = mean(value, na.rm = TRUE)) %>%
-  ungroup() %>%
-  group_by(name) %>%
-  mutate(diff_to_mean = value - mean) %>%
-  ungroup() %>%
-  group_by(name, year, month, day) %>%
-  summarise(daily_mean_diff_to_mean = mean(diff_to_mean, na.rm = TRUE)) %>%
-  mutate(
-    date = as_date(str_c(year, month, day, sep = "-")),
-    colour_category = if_else(daily_mean_diff_to_mean <= 0, "negative", "positive")
-  ) %>%
-  ggplot(aes(
-    date,
-    daily_mean_diff_to_mean
-  )) +
-  geom_area(
-    fill = "red",
-    alpha = .3
-  ) +
-  geom_ribbon(aes(ymin = 0, ymax = ifelse(daily_mean_diff_to_mean >= 0, 0, daily_mean_diff_to_mean)),
-    fill = "green",
-    alpha = .3
-  ) +
-  # scale_fill_manual() +
-  # scale_fill_gradient2(low='darkgreen', mid='snow3', high='red') +
-  scale_x_date(
-    date_breaks = "3 month",
-    date_minor_breaks = "1 month",
-    date_labels = "%b\n'%y"
-  ) +
-  theme(legend.position = "none") +
-  facet_wrap(~name, ncol = 1, scales = "free_y")
-```
-
 ```{r}
 days_in_week <- tibble(
   weekday = weekdays(x = as.Date(seq(7), origin = "1950-01-01")),
@@ -360,7 +321,7 @@ station_data %>%
   facet_wrap(~name, ncol = 1)
 ```
 
-Mean concentrations per per hour per weekday
+Mean concentrations per hour per weekday
 ```{r}
 station_data %>%
   select(-stickoxide) %>%
@@ -377,7 +338,7 @@ station_data %>%
   facet_grid(weekday_id ~ name, scales = "free_y")
 ```
 
-Concentrations over the day on weekdays over time
+Mean concentrations over the day (Mon - Fri only) over time
 ```{r}
 station_data %>%
   select(-stickoxide) %>%
@@ -398,7 +359,7 @@ station_data %>%
   facet_wrap(~ name)
 ```
 
-Concentrations over the day on weekends over time
+Concentrations over the day (Sat - Sun only) over time
 ```{r}
 station_data %>%
   select(-stickoxide) %>%
@@ -419,28 +380,8 @@ station_data %>%
   facet_wrap(~ name)
 ```
 
-Mean concentrations per per hour per weekday
-```{r}
-station_data %>%
-  select(-stickoxide) %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(name, weekday, daytime) %>%
-  summarise(mean_weekday_daytime = mean(value, na.rm = TRUE)) %>%
-  group_by(name) %>%
-  left_join(days_in_week, by = "weekday") %>%
-  arrange(weekday_id, daytime) %>%
-  ggplot(aes(daytime, weekday_id, fill = mean_weekday_daytime, group = name)) +
-  geom_tile(alpha = .5) +
-  theme(legend.position = "none") +
-  scale_fill_gradient(low = "darkgreen", high = "red") +
-  scale_y_reverse(
-    breaks = 1:7,
-    labels = pull(days_in_week, weekday)
-  ) +
-  facet_wrap(~name, ncol = 3, scales = "free_y")
-```
 
-
+Weekly mean concentrations over time
 ```{r}
 station_data %>%
   select(-stickstoffdioxid, -stickstoffmonoxid) %>%
@@ -456,7 +397,7 @@ station_data %>%
   scale_y_reverse(breaks = unique(pull(station_data, year)))
 ```
 
-
+Daily mean concentrations over time
 ```{r}
 station_data %>%
   select(-stickstoffdioxid, -stickstoffmonoxid) %>%
@@ -478,16 +419,18 @@ station_data %>%
 
 ## Before After Comparison
 
+First day of contact restrictions, bar closings etc. in Berlin
 ```{r}
 date_corona_restrictions <- ymd_hms("2020-03-21 00:00:00")
 ```
 
-
+Add categorical column for corona status
 ```{r}
 station_data <- station_data %>% 
   mutate(corona = if_else(date >= date_corona_restrictions, "after", "before"))
 ```
 
+Determine calender weeks that are affected by restricions
 ```{r}
 calender_weeks_since_corona <- station_data %>% 
   filter(corona == "after") %>% 
@@ -495,7 +438,7 @@ calender_weeks_since_corona <- station_data %>%
   pull(week)
 ```
 
-
+Concentrations per weekday before and after corona restrictions
 ```{r}
 station_data %>% 
   filter(week %in% calender_weeks_since_corona) %>%
@@ -519,7 +462,7 @@ station_data %>%
   facet_grid(corona ~ name)
 ```
 
-
+Concentrations per hour per weekday before and after corona restrictions (as line plot)
 ```{r}
 station_data %>%
   filter(week %in% calender_weeks_since_corona) %>%
@@ -538,7 +481,7 @@ station_data %>%
   facet_grid(weekday_id ~ name)
 ```
 
-
+Concentrations per hour per weekday before and after corona restrictions (as bar plot)
 ```{r}
 station_data %>%
   filter(week %in% calender_weeks_since_corona) %>%

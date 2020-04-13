@@ -1,7 +1,7 @@
 Air Pollution in Berlin during Corona
 ================
 Maximilian Nölscher
-2020-03-31
+2020-04-13
 
 ``` r
 library(sf)
@@ -195,7 +195,7 @@ Show the dataframe
 station_data
 ```
 
-    ## # A tibble: 141,957 x 11
+    ## # A tibble: 142,292 x 11
     ##    date                 year month  week   day weekday daytime yearday
     ##    <dttm>              <dbl> <dbl> <dbl> <int> <chr>     <int>   <dbl>
     ##  1 2004-01-01 01:00:00  2004     1     1     1 Thursd…       1       1
@@ -208,7 +208,7 @@ station_data
     ##  8 2004-01-01 08:00:00  2004     1     1     1 Thursd…       8       1
     ##  9 2004-01-01 09:00:00  2004     1     1     1 Thursd…       9       1
     ## 10 2004-01-01 10:00:00  2004     1     1     1 Thursd…      10       1
-    ## # … with 141,947 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
+    ## # … with 142,282 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
     ## #   stickstoffdioxid <dbl>, stickoxide <dbl>
 
 ``` r
@@ -245,7 +245,7 @@ station_data %>%
   facet_wrap(~name, ncol = 1, scales = "free_y")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-25-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-25-1.png" width="100%" style="display: block; margin: auto;" />
 
 Filter out years before the data gab
 
@@ -270,7 +270,7 @@ station_data %>%
   facet_wrap(~name, ncol = 1, scales = "free_y")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-27-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-27-1.png" width="100%" style="display: block; margin: auto;" />
 
 Daily values compared to period mean
 
@@ -304,49 +304,7 @@ station_data %>%
   facet_wrap(~name, ncol = 1, scales = "free_y")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-28-1.png" style="display: block; margin: auto;" />
-
-Mean daily values compared to period mean
-
-``` r
-station_data %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(name) %>%
-  mutate(mean = mean(value, na.rm = TRUE)) %>%
-  ungroup() %>%
-  group_by(name) %>%
-  mutate(diff_to_mean = value - mean) %>%
-  ungroup() %>%
-  group_by(name, year, month, day) %>%
-  summarise(daily_mean_diff_to_mean = mean(diff_to_mean, na.rm = TRUE)) %>%
-  mutate(
-    date = as_date(str_c(year, month, day, sep = "-")),
-    colour_category = if_else(daily_mean_diff_to_mean <= 0, "negative", "positive")
-  ) %>%
-  ggplot(aes(
-    date,
-    daily_mean_diff_to_mean
-  )) +
-  geom_area(
-    fill = "red",
-    alpha = .3
-  ) +
-  geom_ribbon(aes(ymin = 0, ymax = ifelse(daily_mean_diff_to_mean >= 0, 0, daily_mean_diff_to_mean)),
-    fill = "green",
-    alpha = .3
-  ) +
-  # scale_fill_manual() +
-  # scale_fill_gradient2(low='darkgreen', mid='snow3', high='red') +
-  scale_x_date(
-    date_breaks = "3 month",
-    date_minor_breaks = "1 month",
-    date_labels = "%b\n'%y"
-  ) +
-  theme(legend.position = "none") +
-  facet_wrap(~name, ncol = 1, scales = "free_y")
-```
-
-<img src="main_files/figure-gfm/unnamed-chunk-29-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-28-1.png" width="100%" style="display: block; margin: auto;" />
 
 ``` r
 days_in_week <- tibble(
@@ -383,9 +341,9 @@ station_data %>%
   facet_wrap(~name, ncol = 1)
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-32-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-31-1.png" width="100%" style="display: block; margin: auto;" />
 
-Mean concentrations per per hour per weekday
+Mean concentrations per hour per weekday
 
 ``` r
 station_data %>%
@@ -403,9 +361,9 @@ station_data %>%
   facet_grid(weekday_id ~ name, scales = "free_y")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-33-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-32-1.png" width="100%" style="display: block; margin: auto;" />
 
-Concentrations over the day on weekdays over time
+Mean concentrations over the day (Mon - Fri only) over time
 
 ``` r
 station_data %>%
@@ -427,9 +385,9 @@ station_data %>%
   facet_wrap(~ name)
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-34-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-33-1.png" width="100%" style="display: block; margin: auto;" />
 
-Concentrations over the day on weekends over time
+Concentrations over the day (Sat - Sun only) over time
 
 ``` r
 station_data %>%
@@ -451,31 +409,9 @@ station_data %>%
   facet_wrap(~ name)
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-35-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-34-1.png" width="100%" style="display: block; margin: auto;" />
 
-Mean concentrations per per hour per weekday
-
-``` r
-station_data %>%
-  select(-stickoxide) %>%
-  pivot_longer(cols = one_of(variables)) %>%
-  group_by(name, weekday, daytime) %>%
-  summarise(mean_weekday_daytime = mean(value, na.rm = TRUE)) %>%
-  group_by(name) %>%
-  left_join(days_in_week, by = "weekday") %>%
-  arrange(weekday_id, daytime) %>%
-  ggplot(aes(daytime, weekday_id, fill = mean_weekday_daytime, group = name)) +
-  geom_tile(alpha = .5) +
-  theme(legend.position = "none") +
-  scale_fill_gradient(low = "darkgreen", high = "red") +
-  scale_y_reverse(
-    breaks = 1:7,
-    labels = pull(days_in_week, weekday)
-  ) +
-  facet_wrap(~name, ncol = 3, scales = "free_y")
-```
-
-<img src="main_files/figure-gfm/unnamed-chunk-36-1.png" style="display: block; margin: auto;" />
+Weekly mean concentrations over time
 
 ``` r
 station_data %>%
@@ -492,7 +428,9 @@ station_data %>%
   scale_y_reverse(breaks = unique(pull(station_data, year)))
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-37-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-35-1.png" width="100%" style="display: block; margin: auto;" />
+
+Daily mean concentrations over time
 
 ``` r
 station_data %>%
@@ -513,7 +451,103 @@ station_data %>%
   labs(fill = "mean")
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-38-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-36-1.png" width="100%" style="display: block; margin: auto;" />
+
+## Before After Comparison
+
+First day of contact restrictions, bar closings etc. in Berlin
+
+``` r
+date_corona_restrictions <- ymd_hms("2020-03-21 00:00:00")
+```
+
+Add categorical column for corona status
+
+``` r
+station_data <- station_data %>% 
+  mutate(corona = if_else(date >= date_corona_restrictions, "after", "before"))
+```
+
+Determine calender weeks that are affected by restricions
+
+``` r
+calender_weeks_since_corona <- station_data %>% 
+  filter(corona == "after") %>% 
+  distinct(week) %>% 
+  pull(week)
+```
+
+Concentrations per weekday before and after corona restrictions
+
+``` r
+station_data %>% 
+  filter(week %in% calender_weeks_since_corona) %>%
+  select(-stickoxide) %>%
+  pivot_longer(cols = one_of(variables)) %>%
+  group_by(corona, name, weekday) %>%
+  summarise(mean_weekday = mean(value, na.rm = TRUE)) %>%
+  group_by(name) %>%
+  left_join(days_in_week) %>%
+  arrange(weekday_id) %>%
+  ggplot(aes(weekday_id, mean_weekday, group = name)) +
+  geom_col(alpha = .5,
+           fill = "red",
+           alpha = 0.6) +
+  theme(legend.position = "none") +
+  scale_x_continuous(
+    breaks = 1:7,
+    labels = pull(days_in_week, weekday)
+  ) +
+  # scale_fill_gradient(low = "darkgreen", high = "red") +
+  facet_grid(corona ~ name)
+```
+
+<img src="main_files/figure-gfm/unnamed-chunk-40-1.png" width="100%" style="display: block; margin: auto;" />
+
+Concentrations per hour per weekday before and after corona restrictions
+(as line plot)
+
+``` r
+station_data %>%
+  filter(week %in% calender_weeks_since_corona) %>%
+  select(-stickstoffdioxid, -stickstoffmonoxid) %>%
+  pivot_longer(cols = one_of(variables)) %>%
+  group_by(corona, name, weekday, daytime) %>%
+  summarise(mean_weekday_daytime = mean(value, na.rm = TRUE)) %>%
+  group_by(name) %>%
+  left_join(days_in_week, by = "weekday") %>%
+  arrange(weekday_id, daytime) %>%
+  ggplot(aes(daytime, mean_weekday_daytime, colour = corona, group = corona)) +
+  geom_line(alpha = .5,
+            size = 1) +
+  # theme(legend.position = "none") +
+  # scale_fill_gradient(low = "darkgreen", high = "red") +
+  facet_grid(weekday_id ~ name)
+```
+
+<img src="main_files/figure-gfm/unnamed-chunk-41-1.png" width="100%" style="display: block; margin: auto;" />
+
+Concentrations per hour per weekday before and after corona restrictions
+(as bar plot)
+
+``` r
+station_data %>%
+  filter(week %in% calender_weeks_since_corona) %>%
+  select(-stickoxide, -stickstoffmonoxid) %>%
+  pivot_longer(cols = one_of(variables)) %>%
+  group_by(corona, name, weekday, daytime) %>%
+  summarise(mean_weekday_daytime = mean(value, na.rm = TRUE)) %>%
+  group_by(name) %>%
+  left_join(days_in_week, by = "weekday") %>%
+  arrange(weekday_id, daytime) %>%
+  ggplot(aes(daytime, mean_weekday_daytime, fill = mean_weekday_daytime, group = name)) +
+  geom_col(alpha = .5) +
+  theme(legend.position = "none") +
+  scale_fill_gradient(low = "darkgreen", high = "red") +
+  facet_grid(corona ~ weekday_id)
+```
+
+<img src="main_files/figure-gfm/unnamed-chunk-42-1.png" width="100%" style="display: block; margin: auto;" />
 
 Compare this years week 12 and 13 to those from the past
 
@@ -531,4 +565,4 @@ station_data %>%
   facet_wrap(~name, ncol = 1)
 ```
 
-<img src="main_files/figure-gfm/unnamed-chunk-39-1.png" style="display: block; margin: auto;" />
+<img src="main_files/figure-gfm/unnamed-chunk-43-1.png" width="100%" style="display: block; margin: auto;" />
