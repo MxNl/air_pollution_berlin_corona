@@ -1,7 +1,7 @@
 Air Pollution in Berlin during Corona
 ================
 Maximilian Nölscher
-2020-04-13
+2020-05-11
 
 ``` r
 library(sf)
@@ -195,7 +195,7 @@ Show the dataframe
 station_data
 ```
 
-    ## # A tibble: 142,292 x 11
+    ## # A tibble: 142,941 x 11
     ##    date                 year month  week   day weekday daytime yearday
     ##    <dttm>              <dbl> <dbl> <dbl> <int> <chr>     <int>   <dbl>
     ##  1 2004-01-01 01:00:00  2004     1     1     1 Thursd…       1       1
@@ -208,7 +208,7 @@ station_data
     ##  8 2004-01-01 08:00:00  2004     1     1     1 Thursd…       8       1
     ##  9 2004-01-01 09:00:00  2004     1     1     1 Thursd…       9       1
     ## 10 2004-01-01 10:00:00  2004     1     1     1 Thursd…      10       1
-    ## # … with 142,282 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
+    ## # … with 142,931 more rows, and 3 more variables: stickstoffmonoxid <dbl>,
     ## #   stickstoffdioxid <dbl>, stickoxide <dbl>
 
 ``` r
@@ -458,14 +458,15 @@ station_data %>%
 First day of contact restrictions, bar closings etc. in Berlin
 
 ``` r
-date_corona_restrictions <- ymd_hms("2020-03-21 00:00:00")
+date_corona_restrictions_start <- ymd_hms("2020-03-21 00:00:00")
+date_corona_restrictions_end1 <- ymd_hms("2020-04-27 00:00:00")
 ```
 
 Add categorical column for corona status
 
 ``` r
 station_data <- station_data %>% 
-  mutate(corona = if_else(date >= date_corona_restrictions, "after", "before"))
+  mutate(corona = if_else(date >= date_corona_restrictions_start & date <= date_corona_restrictions_end1, "after", "before"))
 ```
 
 Determine calender weeks that are affected by restricions
@@ -554,7 +555,7 @@ Compare this years week 12 and 13 to those from the past
 ``` r
 station_data %>%
   select(-stickoxide) %>%
-  filter(week %in% c(12, 13)) %>%
+  filter(week %in% calender_weeks_since_corona) %>%
   pivot_longer(cols = one_of(variables)) %>%
   group_by(name, year) %>%
   summarise(mean_year_kw1213 = mean(value, na.rm = TRUE)) %>%
