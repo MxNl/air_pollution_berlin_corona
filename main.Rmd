@@ -113,7 +113,7 @@ Make dataframe of urls to fetch
 ```{r}
 urls_to_fetch <- map2_dfr(period_starting_dates,
                           period_ending_dates,
-                          .f = ~ cus_fun_fill_dates_in_url(pull(filter(download_urls, station_id == 115), url), 
+                          .f = ~ cus_fun_fill_dates_in_url(pull(filter(download_urls, station_id == 174), url), 
                                                            .x, 
                                                            .y)
 )
